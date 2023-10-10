@@ -39,6 +39,8 @@ MqttClient mqtt(wifiClient);
 
 String agentRole = String("dfrobotSEN0306");
 String outputTopicStatus = agentRole + "/any/status";
+String outputTopicDistance = agentRole + "/any/distance";
+
 
 StaticJsonDocument<32> outputDoc;
 std::string outputMessage;
@@ -106,7 +108,29 @@ void MQTT_connect() {
 
 }
 
+void sendDistance(int d) {
+  // JsonArray array = outputDoc.to<JsonArray>();
+  
+  // outputDoc["quat"] = JsonArray[x,y,z,w];
+  outputDoc = JsonInteger(d);
 
+  outputMessage = ""; // clear the output string
+  serializeMsgPack(outputDoc, outputMessage); // serialize the data
+
+  // send: retain = false, QOS 0
+  mqtt.beginMessage(outputTopicDistance, false, 0);
+
+  for (int i = 0; i < outputMessage.length(); i++) {
+    mqtt.print(outputMessage[i]);
+  }
+
+  mqtt.endMessage();
+}
+
+void updateOutputTopics(String id) {
+  outputTopicStatus = agentRole + "/" + id + "/status";
+  outputTopicDistance = agentRole + "/any/distance";
+}
 
 void setup() {
   sensorOK = false;
@@ -117,6 +141,10 @@ void setup() {
   Serial.begin(115200);
   delay(10);
   connectWiFi();
+
+  String id = WiFi.macAddress();
+  updateOutputTopics(id);
+
   delay(1000);
   MQTT_connect();
 }
@@ -152,5 +180,6 @@ void loop() {
       }
     } // Read the obstacle distance of maximum reflection intensity
     // Serial.println(YCT1); // Output the obstacle distance of maximum reflection intensity
+    sendDistance(YCT1);
   }
 }
