@@ -2,6 +2,8 @@
 
 Intended for use on DFRobot SEN0306 radar module.
 
+Cables.GL visualisation at: https://cables.gl/p/V-IEpI
+
 ## Single Target mode
 This works quite reliably, especially for solid (non-human) objects and surfaces.
 
