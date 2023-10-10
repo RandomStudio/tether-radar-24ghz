@@ -27,7 +27,7 @@
 #define MQTT_USER "tether"
 #define MQTT_PASS "sp_ceB0ss!"
 
-#define AGENT_ROLE "fusionIMU"
+#define AGENT_ROLE "dfrobotSEN0306"
 
 char col;// For storing the data read from serial port
 unsigned char buffer_RTT[8] = {};
@@ -37,7 +37,7 @@ SoftwareSerial mySerial(27, 33);
 WiFiClient wifiClient;
 MqttClient mqtt(wifiClient);
 
-String agentRole = String("dfrobotSEN0306");
+String agentRole = String(AGENT_ROLE);
 String outputTopicStatus = agentRole + "/any/status";
 String outputTopicDistance = agentRole + "/any/distance";
 
@@ -129,7 +129,7 @@ void sendDistance(int d) {
 
 void updateOutputTopics(String id) {
   outputTopicStatus = agentRole + "/" + id + "/status";
-  outputTopicDistance = agentRole + "/any/distance";
+  outputTopicDistance = agentRole + "/" + id + "/any/distance";
 }
 
 void setup() {
