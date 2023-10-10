@@ -30,10 +30,23 @@
 #define AGENT_ROLE "dfrobotSEN0306"
 #define SEND_INTERVAL 16
 
+
+// 0 = SINGLE_MAX_REFLECTIVITY
+// 1 = MULTI_MAX_3
+#define SENSOR_MODE 0
+
 char col;// For storing the data read from serial port
-unsigned char buffer_RTT[8] = {};
-int YCTa = 0, YCTb = 0,YCT1 = 0;
-SoftwareSerial mySerial(27, 33);
+
+#if SENSOR_MODE == 0
+  unsigned char buffer_RTT[8] = {};
+  int YCTa = 0, YCTb = 0,YCT1 = 0;
+  SoftwareSerial sensorSerial(27, 33);  // not 4,5 - not sure why
+#else
+  unsigned char buffer_RTT[134] = {};
+  int YCTa = 0, YCTb = 0,YCT1 = 0,checka,checkb,Tarnum=1,TargetY1 = 0;
+  double Tar1a,Tar1b,Distance,Distance1,Distance2,Distance3;
+  SoftwareSerial sensorSerial(4,5); 
+#endif
 
 WiFiClient wifiClient;
 MqttClient mqtt(wifiClient);
@@ -41,7 +54,6 @@ MqttClient mqtt(wifiClient);
 String agentRole = String(AGENT_ROLE);
 String outputTopicStatus = agentRole + "/any/status";
 String outputTopicDistance = agentRole + "/any/distance";
-
 
 StaticJsonDocument<32> outputDoc;
 std::string outputMessage;
@@ -68,7 +80,13 @@ void connectWiFi() {
 
 
 void sendStatus(bool sensorOK = true) {
-   outputDoc["sensorOK"] = sensorOK;
+  outputDoc["sensorOK"] = sensorOK;
+
+  #if SENSOR_MODE == 0
+  outputDoc["mode"] = "SINGLE_MAX_REFLECTIVITY";
+  #else
+  outputDoc["mode"] = "MULTI_MAX_3";
+  #endif
 
   outputMessage = ""; // clear the output string
 
@@ -112,11 +130,8 @@ void MQTT_connect() {
 
 }
 
-void sendDistance(int d) {
-  // JsonArray array = outputDoc.to<JsonArray>();
-  
-  // outputDoc["quat"] = JsonArray[x,y,z,w];
-  outputDoc = JsonInteger(d);
+void sendDistance(int distance) {
+  outputDoc = JsonInteger(distance);
 
   outputMessage = ""; // clear the output string
   serializeMsgPack(outputDoc, outputMessage); // serialize the data
@@ -137,12 +152,14 @@ void updateOutputTopics(String id) {
 }
 
 void setup() {
+  
   sensorOK = false;
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
 
-  mySerial.begin(57600);
+  sensorSerial.begin(57600);
   Serial.begin(115200);
+  Serial.println("START");
   delay(10);
   connectWiFi();
 
@@ -172,34 +189,35 @@ void loop() {
   // check if we're connected, and reconnect if not
   MQTT_connect();
 
-  // Send data only when received data
-  if (mySerial.read() == 0xff)
-  {
+  #if SENSOR_MODE == 0
 
-    // First time got a reading; send status OK
-    if (!sensorOK) {
-      sensorOK = true;
-      sendStatus(true);
-    }
+  if (sensorSerial.read() == 0xff) {
 
-    // Read the incoming byte.
-    for (int j = 0; j < 8; j++)
-    {
-      col = mySerial.read();
-      buffer_RTT[j] = (char)col;
-      delay(2);
-    }
-    mySerial.flush();
-    if (buffer_RTT[1] == 0xff)
-    {
-      if (buffer_RTT[2] == 0xff)
-      {
-        YCTa = buffer_RTT[3];
-        YCTb = buffer_RTT[4];
-        YCT1 = (YCTa << 8) + YCTb;
+      // First time got a reading; send status OK
+      if (!sensorOK) {
+        sensorOK = true;
+        Serial.println("Sensor first read OK");
+        sendStatus(true);
       }
-    } // Read the obstacle distance of maximum reflection intensity
-    // Serial.println(YCT1); // Output the obstacle distance of maximum reflection intensity
-    sendDistance(YCT1);
+
+      for (int j = 0; j < 8; j++){
+        col = sensorSerial.read();
+        buffer_RTT[j] = (char)col;
+        delay(2);        
+      }
+      sensorSerial.flush();
+      if (buffer_RTT[1]==0xff) {
+        if (buffer_RTT[2]==0xff) {
+          YCTa = buffer_RTT[3];      
+          YCTb = buffer_RTT[4];
+          YCT1 = (YCTa << 8) + YCTb;               
+        }
+      }//Read the obstacle distance of maximum reflection intensity
+      // Serial.print("D: ");
+      // Serial.println(YCT1);//Output the obstacle distance of maximum reflection intensity          
+      sendDistance(YCT1);
   }
+
+  #endif
+
 }
