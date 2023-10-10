@@ -33,8 +33,8 @@
 // 0 = SINGLE_MAX_REFLECTIVITY
 // 1 = MULTI_MAX
 #define SENSOR_MODE 1
-#define USE_TETHER 0
-#define USE_SERIAL 1
+#define USE_TETHER 1
+#define USE_SERIAL 0
 
 char col;  // For storing the data read from serial port
 
@@ -195,9 +195,9 @@ void loop() {
 #if USE_TETHER == 1
     unsigned long currentTime = millis();
 
-    if (currentTime - savedTime < interval) {
-        return;
-    }
+    // if (currentTime - savedTime < interval) {
+    //     return;
+    // }
 
     // call poll() regularly to allow the library to send MQTT keep alives which avoids being disconnected by the broker
     mqtt.poll();
@@ -245,6 +245,13 @@ void loop() {
     // MULTI TARGETS
 
     if (sensorSerial.read() == 0xff) {
+#if USE_SERIAL == 1
+        Serial.println("..... New reading");
+#endif
+        double distances[3] = {0,
+                               0,
+                               0};
+
         // Read the incoming byte
         for (int j = 0; j < 134; j++) {
             col = sensorSerial.read();
@@ -257,6 +264,10 @@ void loop() {
                 YCTa = buffer_RTT[3];
                 YCTb = buffer_RTT[4];
                 YCT1 = (YCTa << 8) + YCTb;
+#if USE_SERIAL == 1
+                Serial.print("............. New maxRef: ");
+                Serial.println(YCT1);
+#endif
             }
         }  // Read obstacle distance of the maximum reflection intensity.
         for (int i = 6; i < 134; i++) {
@@ -276,6 +287,7 @@ void loop() {
                         Tar1a = Tar1a + Tar1b;
                         Distance = Tar1a * 0.126;
                         Distance = Distance * 100;  // Metres to cm?
+                        distances[Tarnum - 1] = Distance;
 #if USE_SERIAL == 1
                         Serial.print("Distance");
                         Serial.print(Tarnum);
@@ -284,6 +296,7 @@ void loop() {
                         Serial.print("D: ");
                         Serial.println(YCT1);  // Output the obstacle distance of the maximum reflection intensity.
 #endif
+
                         if (Tarnum == 1) {
                             Distance1 = Distance;
                         }
@@ -299,8 +312,16 @@ void loop() {
             }
         }  // for loop
 #if USE_TETHER == 1
-        sendDistance(Distance);
-        sendDistances(Distance1, Distance2, Distance3);
+        sendDistance(YCT1);
+        sendDistances(distances[0], distances[1], distances[2]);
+#endif
+
+#if USE_SENOR == 1
+        for (int i = 0; i < 3; i++) {
+            Serial.print(distances[i]);
+            Serial.print(",");
+        }
+        Serial.println("");
 #endif
 
         Tarnum = 1;
