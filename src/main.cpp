@@ -32,7 +32,7 @@
 
 // 0 = SINGLE_MAX_REFLECTIVITY
 // 1 = MULTI_MAX
-#define SENSOR_MODE 0
+#define SENSOR_MODE 1
 #define USE_TETHER 0
 #define USE_SERIAL 1
 
@@ -275,13 +275,15 @@ void loop() {
                         Tar1b = Tar1b / 2;
                         Tar1a = Tar1a + Tar1b;
                         Distance = Tar1a * 0.126;
-                        Distance = Distance * 100;  // Metres to cm
-                        // Serial.print("Distance");
-                        // Serial.print(Tarnum);
-                        // Serial.print(":");
-                        // Serial.println(Distance);  // Output the distance of other obstacles, can read other 3 obstacles at most.
-                        // Serial.print("D: ");
-                        // Serial.println(YCT1);  // Output the obstacle distance of the maximum reflection intensity.
+                        Distance = Distance * 100;  // Metres to cm?
+#if USE_SERIAL == 1
+                        Serial.print("Distance");
+                        Serial.print(Tarnum);
+                        Serial.print(":");
+                        Serial.println(Distance);  // Output the distance of other obstacles, can read other 3 obstacles at most.
+                        Serial.print("D: ");
+                        Serial.println(YCT1);  // Output the obstacle distance of the maximum reflection intensity.
+#endif
                         if (Tarnum == 1) {
                             Distance1 = Distance;
                         }
@@ -296,9 +298,10 @@ void loop() {
                 }
             }
         }  // for loop
-
+#if USE_TETHER == 1
         sendDistance(Distance);
         sendDistances(Distance1, Distance2, Distance3);
+#endif
 
         Tarnum = 1;
     }
