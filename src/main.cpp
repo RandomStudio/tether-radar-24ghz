@@ -28,6 +28,7 @@
 #define MQTT_PASS "sp_ceB0ss!"
 
 #define AGENT_ROLE "dfrobotSEN0306"
+#define SEND_INTERVAL 16
 
 char col;// For storing the data read from serial port
 unsigned char buffer_RTT[8] = {};
@@ -46,6 +47,9 @@ StaticJsonDocument<32> outputDoc;
 std::string outputMessage;
 
 bool sensorOK;
+const long interval = SEND_INTERVAL;
+unsigned long savedTime = 0;
+
 
 void connectWiFi() {
   Serial.println("Connecting to WiFi");
@@ -129,7 +133,7 @@ void sendDistance(int d) {
 
 void updateOutputTopics(String id) {
   outputTopicStatus = agentRole + "/" + id + "/status";
-  outputTopicDistance = agentRole + "/" + id + "/any/distance";
+  outputTopicDistance = agentRole + "/" + id + "/distance";
 }
 
 void setup() {
@@ -152,6 +156,22 @@ void setup() {
 
 
 void loop() {
+
+  unsigned long currentTime = millis();
+
+
+  if (currentTime - savedTime < interval) {
+    return;
+  }
+  
+   // call poll() regularly to allow the library to send MQTT keep alives which avoids being disconnected by the broker
+  mqtt.poll();
+
+  savedTime = currentTime;
+
+  // check if we're connected, and reconnect if not
+  MQTT_connect();
+
   // Send data only when received data
   if (mySerial.read() == 0xff)
   {
