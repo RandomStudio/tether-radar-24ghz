@@ -12,6 +12,8 @@
 * All above must be included in any redistribution
 * ****************************************************/
 #include <Arduino.h>
+#include <ArduinoMqttClient.h>
+#include <ArduinoJson.h> 
 #include <SoftwareSerial.h>
 #include <WiFi.h>
 
@@ -20,24 +22,28 @@
 #define WLAN_SSID "Random Guest"
 #define WLAN_PASS "beourguest"
 
+#define MQTT_IP "10.112.20.165" 
+#define MQTT_PORT 1883
+#define MQTT_USER "tether"
+#define MQTT_PASS "sp_ceB0ss!"
+
+#define AGENT_ROLE "fusionIMU"
+
 char col;// For storing the data read from serial port
 unsigned char buffer_RTT[8] = {};
 int YCTa = 0, YCTb = 0,YCT1 = 0;
 SoftwareSerial mySerial(27, 33);
 
 WiFiClient wifiClient;
+MqttClient mqtt(wifiClient);
 
-void connectWiFi();
+String agentRole = String("dfrobotSEN0306");
+String outputTopicStatus = agentRole + "/any/status";
 
-void setup() {
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW);
+StaticJsonDocument<32> outputDoc;
+std::string outputMessage;
 
-  mySerial.begin(57600);
-  Serial.begin(115200);
-  delay(10);
-  connectWiFi();
-}
+bool sensorOK;
 
 void connectWiFi() {
   Serial.println("Connecting to WiFi");
@@ -50,14 +56,84 @@ void connectWiFi() {
     digitalWrite(LED_PIN, ledOn ? HIGH : LOW);
     ledOn = !ledOn;
   }
-  Serial.println("WiFi connected");
+  Serial.println("...WiFi connected");
   digitalWrite(LED_PIN, HIGH);
 }
+
+
+void sendStatus(bool sensorOK = true) {
+   outputDoc["sensorOK"] = sensorOK;
+
+  outputMessage = ""; // clear the output string
+
+  serializeMsgPack(outputDoc, outputMessage); // serialize the data
+
+  // send: retain = false, QOS 2
+  mqtt.beginMessage(outputTopicStatus, false, 2);
+
+  for (int i = 0; i < outputMessage.length(); i++) {
+    mqtt.print(outputMessage[i]);
+  }
+
+  mqtt.endMessage();
+}
+
+
+
+// Function to connect and reconnect as necessary to the MQTT server.
+// Should be called in the loop function and it will take care of connecting.
+void MQTT_connect() {
+  // Stop if already connected.
+  if (mqtt.connected()) {
+    return;
+  }
+
+  Serial.print("Connecting to MQTT Broker @ ");
+  Serial.print(MQTT_IP);
+  Serial.println(" ... ");
+
+  mqtt.setUsernamePassword(MQTT_USER, MQTT_PASS);
+
+  while (!mqtt.connect(MQTT_IP, MQTT_PORT)) {
+    Serial.println(mqtt.connectError());
+    Serial.println("Retrying MQTT connection in 5 seconds...");
+    delay(5000);  // wait 5 seconds
+  }
+
+  Serial.println("...MQTT Connected!");
+
+  sendStatus(false);
+
+}
+
+
+
+void setup() {
+  sensorOK = false;
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+
+  mySerial.begin(57600);
+  Serial.begin(115200);
+  delay(10);
+  connectWiFi();
+  delay(1000);
+  MQTT_connect();
+}
+
+
 
 void loop() {
   // Send data only when received data
   if (mySerial.read() == 0xff)
   {
+
+    // First time got a reading; send status OK
+    if (!sensorOK) {
+      sensorOK = true;
+      sendStatus(true);
+    }
+
     // Read the incoming byte.
     for (int j = 0; j < 8; j++)
     {
@@ -75,6 +151,6 @@ void loop() {
         YCT1 = (YCTa << 8) + YCTb;
       }
     } // Read the obstacle distance of maximum reflection intensity
-    Serial.println(YCT1); // Output the obstacle distance of maximum reflection intensity
+    // Serial.println(YCT1); // Output the obstacle distance of maximum reflection intensity
   }
 }
