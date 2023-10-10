@@ -33,18 +33,20 @@
 // 0 = SINGLE_MAX_REFLECTIVITY
 // 1 = MULTI_MAX
 #define SENSOR_MODE 0
+#define USE_TETHER 0
+#define USE_SERIAL 1
 
 char col;  // For storing the data read from serial port
 
 #if SENSOR_MODE == 0
 unsigned char buffer_RTT[8] = {};
 int YCTa = 0, YCTb = 0, YCT1 = 0;
-SoftwareSerial sensorSerial(27, 33);  // not 4,5 - not sure why
+SoftwareSerial sensorSerial(27, 33);  // GPIO pins 27+33
 #else
 unsigned char buffer_RTT[134] = {};
 int YCTa = 0, YCTb = 0, YCT1 = 0, checka, checkb, Tarnum = 1, TargetY1 = 0;
 double Tar1a, Tar1b, Distance, Distance1, Distance2, Distance3;
-SoftwareSerial sensorSerial(27, 33);
+SoftwareSerial sensorSerial(27, 33);  // GPIO pins 27+33
 #endif
 
 WiFiClient wifiClient;
@@ -175,6 +177,9 @@ void setup() {
     Serial.begin(115200);
     Serial.println("START");
     delay(10);
+
+#if USE_TETHER == 1
+
     connectWiFi();
 
     String id = WiFi.macAddress();
@@ -182,9 +187,12 @@ void setup() {
 
     delay(1000);
     MQTT_connect();
+
+#endif
 }
 
 void loop() {
+#if USE_TETHER == 1
     unsigned long currentTime = millis();
 
     if (currentTime - savedTime < interval) {
@@ -198,6 +206,7 @@ void loop() {
 
     // check if we're connected, and reconnect if not
     MQTT_connect();
+#endif
 
 #if SENSOR_MODE == 0
 
@@ -222,9 +231,13 @@ void loop() {
                 YCT1 = (YCTa << 8) + YCTb;
             }
         }  // Read the obstacle distance of maximum reflection intensity
-        // Serial.print("D: ");
-        // Serial.println(YCT1);//Output the obstacle distance of maximum reflection intensity
+// Serial.print("D: ");
+#if USE_SERIAL == 1
+        Serial.println(YCT1);  // Output the obstacle distance of maximum reflection intensity
+#endif
+#if USE_TETHER == 1
         sendDistance((double)YCT1);
+#endif
     }
 
 #else
